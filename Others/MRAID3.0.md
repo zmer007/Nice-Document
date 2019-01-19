@@ -257,3 +257,78 @@ MRAID 通过可以集成普通的 API（common APIs）来实现存储并转发�
 MRAID 已经并一直都支持在广告上展示一个小图标（icon）且可以打开一个窗口提供给用户更多关于广告的信息，所以 MRAID 3.0 无需对这方面内容做升级。广告开发者和移动供应商应该审查 Interest-Based Advertising（IBA）原则，这些原则是广告制作与投放策略的一部分。
 
 ## 3 初始化及设置
+在 host 中初始化一个可以执行或展示广告的容器后，MRAID 就可以在原生应用环境下完成广告中的复杂交互。下面将介绍初始化程序。
+
+### 3.1 初始化概要
+MRAID 通过实现一个可以展示广告的容器来管理广告与应用之前的交互。广告设计者必须使用 `marid.js` 脚本，但 host 则需要使用 webview 来支持 JavaScript 库。
+
+webview 需要保证调用 `mraid.js` 引用时，相应的 JavaScript 库是都是可以的才行。webview 通过发送 `ready` 事件来确保这些库已准备好了。
+
+下面分步总结这些行为，包括广告与 MRAID 容器是如何参与广告初始化的，还有 MRAID API 库的注册。
+ 1. host 创建 webview 用来执行广告
+ 2. 在广告加载之前，host 初始化 *MRAID_ENV* 对象，广告可以根据些对象识别 MRAID 规范。
+ 2. 广告加载完成之前，广告通过调用 MRAID 脚本标签来识别 MRAID 规范。详情看 3.1.1
+ 2. （可选）host 检测 MRAID 脚本调用。
+ 2. host 为广告提供 MRAID 桥接器。
+ 2. host 提供一个带有限制的 MRAID 对象，此对象状态为加载中（state = 'loading'）并且可以查询状态
+ 2. 广告必须等到 `mraid.js` 加载完成后，才能访问 mraid 对象，才能使用`mraid.js` 中的 `createElement` 方法。广告需要确定 `mraid.js` 是可用的，必须监听 `ready` 事件来监测 `mraid.js` 完全可用。
+ 2. 广告执行 `mraid.getState() == 'loading'` 为 `true` 之后，使用 `mraid.addEventListener('ready')` 来监听 `ready` 事件。
+ 2. host 将 MRAID 库加载至 webview
+    1. 将 MRAID 状态置为 'default'，并且发送 `stateChange` 事件
+    2. 触发 MRAID `ready` 事件。
+ 2. 广告事件监听对象收到 `ready` 事件，并且可以访问 MRAID 中广告所需的特性了。
+
+#### 3.1.1 检测 MRAID 广告加载完成
+当 webview 中包含广告的页面（document）被解析并且它的所有子资源（包含广告物料）被加载完成后，此时广告就处于加载完成状态了。这时，`ocument.readyState` 被置成 `complete`，`load` 事件会被发送到 `window` 对象。
+
+此检测不一定被所有广告类型所需要，比如，小尺寸的 banner 广告可能不需要这个。但是所有大尺寸广告都必须检测，比如，插屏或其它渲染前需要加载重多物料的广告。
+
+host 可以通过下面的方法检测 webview 以及它所包含广告物料的组件已经加载完成了：
+ 1. 在 Android 端，使用 onPageFinished() 处理器（handler）。
+ 2. 在 iOS* 通过轮询（polling）webview 广告页（document）的 `document.readyState` 来检测，直到它被置为 `complete` 并且 `load` 事件被发送到 `window` 对象上。
+
+host 在 iOS 上也可以使用 `webViewDidFinishLoad()` 方法，但是此方法有时触发的太早了。所以在 iOS 也必须同时使用 `document.readyState` 来验证广告加载状态。
+
+当未知原因导致广告未被加载时，广告需要通过 `mraid.unload()` 方法通知 SDK 广告没有展示。
+
+#### 3.1.2 声明 MRAID 环境细节（Environment Details）
+之前版本的 MRAID，尽可能早地给广告提供识别一个 MRAID 广告的指导（guidance，用 `mraid.js` 识别），但是广告不能访问它将要填入的容器的信息。某些情况下，广告供应商同时提供一个有 MRAID 的版本与一个无 MRAID 的版本，广告服务器收集环境的详情后就不去在不支持 MRAID 的环境上调用 `mraid.js` 特性了。
+
+MRAID 3.0 版本的广告容器提供了一个 `MRAID_ENV` 对象，此对象可以检验该容器是否符合 MRAID 标准并包含环境的信息，如 MRAID 版本，SDK 版本以及其它可以给广告提供便利的信息。即使广告没有加载 `mraid.js` 脚本，`MRAID_ENV` 对象也是可以使用的。
+
+`MRAID_ENV` 对象声名了 MRAID 环境、SDK 容器的信息，并且只要创意一旦上传后，这些信息就可以使用。广告可以使用这些详细信息去发布更好体验的广告并提升数据分析效果。
+
+下面的脚本是 `MRAID_ENV` 对象的一种示例：
+```
+<script>
+window.MRAID_ENV = {
+    version: '3.0',
+    sdk: 'SDK Name',
+    sdkVersion: '1.0.0',
+    appid: 'com.iab.myapp',
+    ifa: '01234567-89ab-cdef-0123-456789abcdef',
+    limitAdTracking: true,
+    coppa: false
+</script>
+```
+
+**MRAID_ENV 属性（Attribute）：**
+下面是广告中使用到的 MRAID_ENV 对象中的属性，此对象是当广告请求时，由 host 提供的。
+|属性|描述|
+|---|---|
+|version*|（string）此 SDK 实现的 MRAID 的版本。它必须与 mraid 接口的 getVersion 方法返回的值一致。|
+|sdk*|（string）运行此 webview 的 SDK 的名称|
+|sdkVersion*|（string）SDK 的版本号。如果没有可用的版本号的话，可以设为空值。|
+|appId|（string）运行广告的应用的包名或应用 ID。通常被叫作 BundleID。|
+|ifa|（string）广告目的的用户 ID。对 iOS来说，此值必须为 IDFA（the Identifier for Advertising）。对 Android 来说，此值必须为 Google 广告 ID（AID，the Google Advertising ID）|
+|limitAdTracking|（Boolean, 设置 IFA 后使用）如果是 true 则禁止广告跟踪行为，否则，跟踪。|
+|coppa|（Boolean，请求儿童类广告）设置为 ture 则为儿童类广告，否则，不是。|
+*代表必须
+
+为了方便起见，不用的可选字段可能会从对象中省略或提供一个默认值（string 类型中的空字符串，数字类型中的 0）。
+
+这个可选字段必须设置默认值或不设置，而且*只有在应用发布者明确选项后才提供*。选项可以是应用的全局选项，或基于曝光广告的一次展示（an impression by impression basis，比如一个发布者同时支持直投 'direct sold' 和匿名投放 'anonymous inventory'）。
+
+对于 2-part 类广告，host 只保证 MRAID_ENV 对象在广告初始化的页面（第一部分）有效。如果 2-part 广告第二部分需要这些详情的话，它必须使用在第一部分接收到的详情。
+
+#### 3.1.3 识别（Identification）
