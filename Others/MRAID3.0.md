@@ -73,9 +73,9 @@ MRAID 是 Mobile Rich Media Ad Interface Definition 的首字母缩写。它使�
 
 MRAID 提供了一个包含多个调用方法的库，广告使用这些调用方法与兼容 MRAID 的应用进行交互。当广告开发者使用 MRAID 时，移动应用支持 MRAID 库中的方法越多，广告体验的可预见性越高。
 
-为提升移动广告执行效果，MRAID 3.0 更新了众多特性，比如，辅助追踪广告可见度，明确广告初始化及就绪状态，对含有视频交互的广告集成了 IAB VPAID (Video Player Ad Interface Definition) 以及其它新增特性。
+为提升移动广告执行效果，MRAID 3.0 更新了众多特性，比如，辅助跟踪广告可见度，明确广告初始化及就绪状态，对含有视频交互的广告集成了 IAB VPAID (Video Player Ad Interface Definition) 以及其它新增特性。
 
-随着使用手机的用户日益增长，对高质量广告的需求也逐渐增长。广告主想要改进追踪方法，应用发布者想要提升广告体验。在高质量的广告中接入或升级到 MRAID 3.0 会拥有更好的表现，也会有更优良的广告追踪。
+随着使用手机的用户日益增长，对高质量广告的需求也逐渐增长。广告主想要改进跟踪方法，应用发布者想要提升广告体验。在高质量的广告中接入或升级到 MRAID 3.0 会拥有更好的表现，也会有更优良的广告跟踪。
 
 ## 周知
 
@@ -130,7 +130,7 @@ MRAID 不仅限于本文档中描述的特性。我们鼓励开发者创新或�
 
 移动广告服务商（提供商）构建一套组件，该组件将广告对移动应用开发者受到影降到最小。广告技术员代表一个可以实现 MRAID 中特定方法的人或平台，他帮助使用 MRAID 的广告设计者或广告开发者实现交互功能。广告设计者或广告开发者制作包含所有预置功能广告之后，广告技术员使用脚本将这些方法规整为 MRAID 规定的方法。提供商可能会提供一些简化技术设计的其它方法。
 
-同理，对于应用来说，提供商开发的这这些交互组件包含一个容器，容器里有简单的 JavaScript 启动标签。这容器就是一个类浏览器环境或 webview 的组件，广告可以在容器里执行标准化的交互协议。应用可能会初始化一个 "listener" 来监听广告发出的某种追踪交互或响应事件。
+同理，对于应用来说，提供商开发的这这些交互组件包含一个容器，容器里有简单的 JavaScript 启动标签。这容器就是一个类浏览器环境或 webview 的组件，广告可以在容器里执行标准化的交互协议。应用可能会初始化一个 "listener" 来监听广告发出的某种跟踪交互或响应事件。
 
 下面的图片展示了部分 MRAID 系统的工作示意：
 ![MARID system](../resource/parts-of-mraid-system.png)
@@ -155,7 +155,7 @@ MRAID 2.0 版本对 1.0 版本进行扩展，通过 `resize()` 方法，给广�
 
 **MRAID 视频附加项**
 
-2.0 版本发布后，工作组在 MRAID 基础上起草了一份关于使用 IAB 视频播放接口定义（VPAID）的附录。这个视频附加项对如何初始化 VPAID 以及 host 如何使用 VPAID 中的事件追踪这些交互提供了指导。
+2.0 版本发布后，工作组在 MRAID 基础上起草了一份关于使用 IAB 视频播放接口定义（VPAID）的附录。这个视频附加项对如何初始化 VPAID 以及 host 如何使用 VPAID 中的事件跟踪这些交互提供了指导。
 
 #### 1.4.1 MRAID 3.0 版本中的更新
 MRAID 3.0 版本是一次重大修改，集成了 2.0 版本附录中的 VPAID，可视性变更，及其它加强富媒体广告体验的特性。MRAID 3.0 更新内容如下：
@@ -415,3 +415,95 @@ MRAID 方法需要知道广告容器的默认设置，并可以覆盖这些默�
 事件处理（Event handing）是 MRAID 功能的关键。自然情况下，web 层与原生层的交互是异步的。通过事件处理，广告可以监听某些事件并在需要的时候响应这些事件。MRAID 提倡广播式（broadcast-style）的事件来支持大量特性与高度一致的灵活性。
 
 ## 4 特性与操作（Operation）
+MRAID 可以使富媒体广告在手机进行交互，比如，扩展，重置大小以及跟踪多种指标。为了保证所有的 MRAID 都可以流畅操作，开发者必须理解广告与应用的操作的顺序和相应的响应。
+
+本节将描述这些功能与操作的细节。第 3 节讲了初始化与设置。第 5 － 7 节讲指定方法、属性和事件的详细情况。第 8 节讲在原生层与设备特性协调的细节，比如创建日历事件与存储图片。第 9 节讲集成 IAB VPAID 广告在原生播放器 IAB VPAID 中的操作与跟踪。
+
+### 4.1 可见性（Viewability）
+当广告展示在 web 浏览器中时，广告中的 JavaScript 代码会检查 DOM 图层的属性并收集图形尺寸信息来决定广告的可见性。然而，这种技术不适用在原生应用容器里展示广告。JavaScript 代码不能检查原生 UI 中的尺寸信息，即，它不知道用户是否可以看到 weview。
+
+对于可见性更完整的描述涉用户交互过程中检测展示的变化情况。MRAID 3.0 引入 `exposureChange` 事件，而不是跟踪当前活动 webview 的可见性。在 7.5 小节可以看到这个事件的详细情况。
+
+MRAID 3.0 更新了可见性相关的内容，其指导原则如下所示：
+ 
+ * **性能（Performance）：** 减少测量给用户端用户体验带来的影响，包括动画的流畅性与电量损耗。
+ * **最小化影响（Minimal impact）：** 只向容器添加可以获取更好可见效果所必需的附件（additions）.
+ * **永不过时的（Future-proof）：** 避免指定明确阈值，以支持即将到来的测量标准，应该提供最大限度的创意灵活性。
+ * **向后兼容（Backwards compatible）：** 当前符合 MRAID 标准的容器必须保持兼容，比如，已存在 API 的含意不应该被重新定义新的含意。
+
+可见性是一个测量指标，用来检测广告是否处于一个用户可以在他们设备上看到的位置。
+
+媒体评级委员会（MRC, the Media Rating Council）在 2016 年公布了测量移动广告可见性的指南。应该使用[这些指南](http://mediaratingcouncil.org/062816%20Mobile%20Viewable%20Guidelines%20Final.pdf)在移动 web 和应用内为跟踪可见广告的展示制定策略。对于移动广告测量来说，MRAID 3.0 的 `exposureChange` 事件与 MRC 的指导是一致了。
+
+`isViewable()` 方法与 `viewableChange` 事件在 MRAID 3.0 中已经过时。在当前版本中保留这些功能只是为了向后兼容性。
+
+#### 4.1.1 轮询速率（Polling Rates）与事件阈值
+升级的一贯准则就是要保持性能，MRAID 3.0 对 `exposureChange` 事件的处理必须不能影响 UI 动画的流畅性或加剧电量消耗。
+
+host 平台升级 MRAID 3.0 实现的同时必须避免与 JavaScript 进行过多的交流。这种结合升级要保证在广告可见区域报告 `expsureChange` 事件后，下次该事件的报告间隔不少于 200 毫秒。当使用轮询时，视图层必须足够频繁去获取展示中的改变，轮询频率不能小于 200 毫秒/次。
+
+**使用示例**
+
+下面程序展示了 `exposureChange` 事件的一次完整过程：
+ 1. 广告容器注册一个监听器监听 `exposureChange` 事件。比如：
+ ```
+ mraid.addEventListener('exposureChange', handleExposureChange);
+ ```
+ 2. `exposureChange` 事件调用广告事件处理器并比较容器框（the contianer rectangle）广告创意的大小，比如：
+ ```
+ function handleExposureChange(exposedPercentage, visibleRectangle, occlusionRectangles) {
+     if (exposedPercentage >= 50.0) {
+         // log visible time ...
+     }
+ }
+ ```
+ 3. 如果广告在可见区域取样时间过长超出了可见性阈值（the viewability threshold），就必须考虑广告是否可见。如果不需要更多的测试信息，要移除 `exposureChange` 监听器，比如：
+ ```
+ mraid.removeEventListener(`exposureChange`, handleExposureChange);
+ ```
+
+#### 4.1.2 实现注意事项（Implementation Considerations）
+用户可应用开发者想要他们有应用有最好的性能表现。广告测量不应该降低应用的性能。MRAID 关于可见性的实现必须将以下内容纳入考虑范围：
+  
+**避免使用 JavaScript 进行耗时工作**
+
+应用 webview 里展示广告是运行在两个处理器线程中的：一个线程用在原生 UI 另一个用在 webview 中的 JavaScript。当原生线程处理等待状态时，要避免 JavaScript 耗时操作。
+
+比如，在 iOS WKWebview 使用 Objective-C 方法：
+```
+evaluateJavaScript:completionHandler
+```
+*此方法没有阻塞 UI 线程的副作用。推荐使用这个方法来替代 webview。*
+
+**使用低延时（low-latency）的 API**
+
+原生平台含有 UI 发生变化时高效低延时地发送通知的 API。实现 MRAID 新事件 `exposureChange` 时，必须使用此类通知，特别是在低轮询率或低功率（back-off）作用下。在 Android 平台下，可以 `ViewTreeObserver` 事件就是这么一个高效的 API。
+
+**防止阻塞操作**
+
+不要在操作系统应用生命周期回调中执行阻塞操作。
+
+在 iOS 中，包括以下 `UIApplicationDelegate` 方法：
+
+ * applicationWillResignActive
+ * applicationDidEnterBackground
+ * applicationWillEnterForeground
+ * applicationDidBecomeActive
+
+NSNotificationsCenter 相应事件也添加到阻塞操作。
+
+在 Android 中，阻塞操作包含以下的 Activity 方法：
+ 
+ * onPause
+ * onStop
+ * onStart
+ * onResume
+
+如果这些方法在几秒内没有返回值，操作系统会终止应用。
+
+**在不阻塞原生操作下将事件加入队列**
+
+有时一个广告中的 JavaScript 可能是错误的或是恶意的。当这些代码因为太长而执行不了时，后面的事件会被延时或阻塞。 MRAID 实现在入队事件（enqueueing events）时一定要避免阻塞原生线程。无论在原生线程还是在 webview 中，入队事件只可以在之前的 MRAID 事件监听器返回结果后再加入。
+
+### 4.2 控制广告展示
+
