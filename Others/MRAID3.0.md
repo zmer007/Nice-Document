@@ -506,4 +506,47 @@ NSNotificationsCenter 相应事件也添加到阻塞操作。
 有时一个广告中的 JavaScript 可能是错误的或是恶意的。当这些代码因为太长而执行不了时，后面的事件会被延时或阻塞。 MRAID 实现在入队事件（enqueueing events）时一定要避免阻塞原生线程。无论在原生线程还是在 webview 中，入队事件只可以在之前的 MRAID 事件监听器返回结果后再加入。
 
 ### 4.2 控制广告展示
+除初始化显示外，广告设计者应该有理由来控制广告的展示：
 
+ * 应用可能加载后台加载广告视图来缓解延时问题，此时广告已经请求了，但是用户可不到广告。
+ * 广告可能超出应用内容默认尺寸
+ * 用户交互完成后，广告可能会返回默认尺寸
+
+4.2.1 到 4.2.4 小节将解释如何控制高级广告的展示，比如扩展广告和插屏广告。
+
+#### 4.2.1 广告状态以及状态是如何改变的
+
+每个执行广告的 webview 都会处于以下的某个状态：
+ 
+ * **loading：** webview 还未准备好与 MRAID 实现进行交互
+ * **default：** 初始状态，容器的尺寸就是被应用和 SDK 放置的尺寸。
+ * **expanded：** 广告容器被扩展到视图层顶部，覆盖在应用内容之上。
+ * **resized：** 广告容器已使用 `resize()` 方法改变过尺寸。
+ * **hidden：** 可交互广告的关闭状态。如果支持的话，banner 广告关闭时也会被置为隐藏。
+
+调用：`expand()`, `resize()`, `close()`, 或 `unload()` 方法时，webview 的状态会发生改变。调用这些方法的影响大概如下表所示：
+|初始状态|expand()|resize()|close()|unload()|
+|---|---|---|---|---|
+|loading|不变|不变|不变|不适用*|
+|default<br/>(banner)|变为 “expanded”|变为 “resized”|变为 “hidden” (如果支持的话)|不适用|
+|expanded|不变|不变|变为 “hidden”|不适用|
+|resize|变为 “expanded”|变为 “resized” 并且更新了值|变为 “default”|不适用|
+|hidden|不变|不变|不变|不适用|
+
+*不适用 因为 `unload()` 方法是用在广告不再展示给用户时的。在这种情况下，host 可以隐藏（dismiss）或移除 webview，然后使用其它的文档（document）来替换它，或使用另一个广告刷新 webview。
+
+two-part 扩张（expandable）类的广告以及插屏广告状态流程会有些许不同：
+
+ **可扩张 Two-Part 广告**
+
+ 可扩张 Two-Part 广告使用两个不同的 webview ，广告组件可以彼此独立扩展。因为 MRAID 广告同一时间只有种状态，可扩张 two-part 广告只要被扩张的视图在屏幕上，它就会一直处于 expanded 状态。
+
+ 新特性，扩张的 webview 会处于 loading 状态，直到 MRAID 可用时。当触发 ready 事件时，广告状态变为 expanded。对于 banner 来说，two-part 广告的第一部分也会改变它的状态，从 default 变为 expanded。
+
+ **插屏广告**
+ 
+ 对于插屏广告，webview 从 loading 变为 default，当插屏广告关闭时，状态变为 hidden。
+
+`getState()` 方法可以获取当前状态，该状态是由最后触发 stateChange 事件的行为确定的。此特性分别会在 6.7 和 7.4 做进一步介绍。
+
+#### 4.2.2 检查屏幕与广告的位置及尺寸
