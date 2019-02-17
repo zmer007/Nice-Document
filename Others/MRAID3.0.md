@@ -908,3 +908,112 @@ host 使用 `vpaidObject.getAdDuration()` 来询问广告视频广告播放时�
 #### 5.14.6 vpaidObject.getAdRemainingTime()
 
 host 使用 `vpaidObject.getAdRemainingTime()` 来查询广告剩余时间。广告会返回查询请求时广告剩余秒数。
+
+## 6 属性
+此节讲解广告通过 host 查询容器属性的方法。某些情况下，广告可以设置属性来指引 host 更新容器来适应广告操作。例如，广告调用 resize 方法之前，必须要设置 resize 属性。host 使用设置的属性相应的调整容器。
+
+### 6.1 supports
+广告可以使用 supports 功能来查询 host 获取应用支持哪些设备原生特性。了解支持哪些原生特性可以帮助广告使用可用的特性来弥补它不支持的特性。
+
+广告向 host 查询以下原生特性：
+|特性|描述|
+|---|---|
+|sms|设备支持 sms 协议：发送 SMS 消息|
+|tel|设备支持 tel 协议：打电话|
+|calendar|设备可以创建一个日历记录|
+|storePicture|设备支持 MRAID storePicture 方法|
+|inlineVideo|设备可以使用 `<video>` 标签播放 HTML5 视频，优化指定 video 标签的尺寸。这不一定是使 video 全屏播放。|
+|vpaid|设备容器支持 VPAID 通信，VPAID 事件会在第 9 节介绍|
+|location|设备支持访问 GPS 坐标|
+
+在任何支持这些属性的设备上，除非 app 发布者检测到的特性与发布政策冲突，app 实现 MRAID 必须传递所有这些功能，
+
+|语法|supports(feature)|
+|---|---|
+|参数|feature：String。特性名，上面表格中列举的|
+|返回值|true: 支持此特性并 get 方法与事件都可用<br/>false: 此设置不支持这个特性|
+|相关事件|无|
+
+### 6.2 getPlacementType
+广告调用 `getPlacementType()` 来检测它是否被加载到一个内置的位置或插屏位置。
+
+为效率起见，广告供应商有时在 banner 与插屏位置使用同一个创意。这些广告可能被设计为根据所放位置不同而有不同的表现。
+
+对于 two-part 可扩展广告来说，第二部分的扩展创意也必须向 host 查询位置类型。
+
+host 返回 'inline' 还是 'interstitial' 可以看下表说明：
+|语法|getPlacementType()|
+|---|---|
+|参数|无|
+|返回值|**inline:** 广告位置默认值为 inline，即将广告内置（banner）到内容中<br/>**interstitial:** 广告位置在内容之上|
+|相关事件|无|
+
+### 6.3 get/set orientationProperties
+广告通过 `orientationProperties` 查询 host 当前设备的方向，使用 `orientationProperties` 来调整扩展和屏幕广告的显示。默认状态的 banner 不能使用 `orientationProperties` 属性。可变大小的广告可以使用 `orientationProperties` 属性，但是不会有任何效果。
+
+下面为 `orientationProperties` 对象的示例代码：
+```
+orientationProperties object = {
+    "allowOrientationChange" : boolean,
+    "forceOrientation" : "portrait|landscape|none"
+}
+```
+这两个方向属性含义如下：
+* **allowOrientationChange:boolean**
+
+其值为 true 时，代表容器支持设备级方向变化；其值为 false 时，容器会忽略设备级方向变化的请求（比如，即使设备的方向改变了，webview 的方向也不会发向变化）。默认为 true。任何时刻，广告都可能绕过 `allowOrientationChange` 使用 `forceOrientation` 变量请求改变方向。
+
+* **forceOrientation:string**
+
+其值为 portrait, landscape 或 none 。如果设置了 `forceOrientation` 不管设备是什么方向都得按要求的方向打开一个视图（view）。例如，当用户在 landscape 模式点击一个 portrait 模式的扩展广告，无论设备或之前广告的方向是什么，打开的广告必须是 portrait 方向的。默认值为 none。
+
+为了更好的控制广告行为，在广告处于扩展状态后，广告应该调整方向对象的属性。这种形式的广告开始为 portrait 但是指导用户改变方向来玩游戏。用户完成游戏之前必须保持方向固定。host 必须可以接收改变，以便满足用户交互与可扩展广告的扩展属性。
+
+广告必须同时设置这两个属性来确保正确控制广告的方向。比如，强制使用 landscape 方向时，要将 `allowOrientationChange` 设为 false， 将 `forceOrientation` 设为 landscape.
+
+代码示例：
+```
+mraid.setOrientationProperties ( {"allowOrientationChange":true} );
+mraid.expand()
+
+/* 用户变成 landscape，开始游戏 */
+mraid.setOrientationProperties ( {"allowOrientationChange":false} );
+
+/* 用户结束游戏 */
+mraid.setOrientationProperties ( {"allowOrientationChange":true} );
+```
+
+`getOrientationProperties` 方法会返回整个 `orientationProperties` 对象。
+|语法|`getOrientationProperties()`|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：包含方向属性|
+|相关事件|无|
+
+`setOrientationProperties` 方法设置 `orientationProperties` 对象中的属性。
+|语法|setOrientationProperties(properties)|
+|---|---|
+|参数|Properties：一个 JavaScript 对象，包含 `allowOrientationChange` 和 `forceOrientation` 值|
+|返回值|无|
+|相关事件|无|
+
+### 6.4 getCurrentAppOrientation
+广告调用 `getCurrentAppOrientation` 向 host 查询 app 当前方向。
+
+无论方向是否被锁定，host 都会返回当前 app 的方向，portrait 或 landscape。如果锁定了，`setOrientationProperties` 中的 `forceOrientation` 选项就无效了。
+|语法|getCurrentAppOrientation()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象 {orientation, locked} 代表：<br/>**orientation:** 可以为 portrait 或 landscape<br/>**locked:** 布尔值，代表当前位置方向是否被锁定，如果值为 true，则代表 `setOrientationProperties` 中的 `forceOrientation` 无效。|
+|相关事件|无|
+
+### 6.5 getCurrentPosition
+广告调用 `getCurrentPosition` 向 host 查询广告容器当前位置。
+
+host 返回广告容器当前位置及密度无关像素尺寸。
+
+|语法|getCurrentPosition()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：{x, y, width, height} 代表：<br/> x 为相对左边偏移密度无关像素值，最大值定义在 `getMaxSize()` 中<br/> y 为相对上边偏移密度无关像素值，最大值定义在 `getMaxSize()` 中<br/> width 为当前容器的宽度的密度无关像素值<br/> height 为当前容器高度的密度无关像素值|
+|相关事件|无|
