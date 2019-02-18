@@ -1017,3 +1017,61 @@ host 返回广告容器当前位置及密度无关像素尺寸。
 |参数|无|
 |返回值|JavaScript 对象：{x, y, width, height} 代表：<br/> x 为相对左边偏移密度无关像素值，最大值定义在 `getMaxSize()` 中<br/> y 为相对上边偏移密度无关像素值，最大值定义在 `getMaxSize()` 中<br/> width 为当前容器的宽度的密度无关像素值<br/> height 为当前容器高度的密度无关像素值|
 |相关事件|无|
+
+### 6.6 getDefaultPosition
+广告调用 `getDefaultPosition` 向 host 查询广告默认容器的位置与尺寸，位置与尺寸单位为密度无关像素。
+
+host 返回广告容器的默认位置与尺寸，此值与调用者 view 所处的状态无关。
+
+|语法|getDefaultPosition()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：{x,y,width,height} 代表：<br/> x 为相对矩形左边偏移的距离，单位为密度无相像素，此矩形定义了 `getMaxSize()` 方法<br/> y 为相对矩形上边偏移的距离，单位为密度无相像素，此矩形定义了 `getMaxSize()` 方法<br/> width 当前容器的宽度，单位为密度无相像素<br/> height 为当前容器的高度，单位为密度无关像素。|
+|相关事件|无|
+
+### 6.7 getState
+广告可能随时使用 `getState` 向 host 查询广告容器的状态以确保正确地调用请求。
+
+host 返回广告容器状态值，这些值可以描述广告容器是处于默认状态及固定位置，或是处于扩展状态，或是处于重置尺寸状态、更大尺寸状态，或是隐藏状态。
+
+|语法|getState()|
+|---|---|
+|参数|无|
+|返回值|String: "loading", "default", "expanded", "resized" or "hidden"|
+|相关事件|stateChange|
+
+### 6.8 get/set expandProperties
+广告使用 `getExpandProperties` 向 host 查询当前扩展设置，使用 `setExpandProperties` 设置扩展的宽高以及可以指定自定义关闭指示器的使用方式。
+
+调用 `expand()` 之前，广告需要使用 `setExpandProperties` 指定想要扩展的宽高。广告可能会指定一个自定义的关闭指示图形来代替 host 的默认关闭指示器。host 调用 `expand()` 方法之后，会忽略所有 expand 属性的设置
+
+下面是一个 `expandProperties` 对象示例代码：
+```
+expandProperties object = {
+    "width":interger,
+    "height":interger,
+    "useCustomClose":boolean,
+    "isModal":boolean(只读)
+}
+```
+|属性|描述|
+|---|---|
+|width|integer, 创意的宽度，默认与全屏等宽|
+|height|integer, 创意的高度，默认与全屏等高。<br/>注意在设置 expand 属性之前获取它，宽和高的值将会反映屏幕的实际值。这将允许想要使用应用或设备值的广告设计者去做必要的调用。|
+|useCustomClose|已过时，MRIAD 3.0 的 host 会忽略此请求<br/><br/> boolean, true 代表容器将停止使用默认关闭图形并在广告创意上放一个自定义的关闭指示器；默认为 false 代表容器使用默认闭关图形。此属性与 5.6 节提到的 `useCustomClose` 方法完全一样，它给可扩展广告的创造者提供了方便。|
+|isModal|boolean, true 代表容器对于扩展的广告是模态的，在扩展时，其它操作都是停止的；false 代表容器对于扩展的广告不是模态的，扩展时，其它操作可能会继续进行。对于广告来说此属性是只读的，不可设置的。|
+
+当广告调用 `getExpandProperties` 时，host 返回完整的 `expandProperties` 对象。
+|语法|getExpandProperties()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：包含广告所有的 expand 属性，如上表所述。|
+|相关事件|无|
+
+广告使用 `setExpandProperties` 来先设置 `expandProperties` 对象，然后使用 `expand()` 方法开始广告扩展。
+
+|语法|setExpandProperties(properties)|
+|---|---|
+|参数|JavaScript 对象：{width, height, useCustomClose} 包含可扩展广告的宽和高。|
+|返回值|无|
+|相关事件|无|
