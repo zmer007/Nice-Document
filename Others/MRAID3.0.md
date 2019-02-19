@@ -1075,3 +1075,14 @@ expandProperties object = {
 |参数|JavaScript 对象：{width, height, useCustomClose} 包含可扩展广告的宽和高。|
 |返回值|无|
 |相关事件|无|
+
+### 6.9 getMaxSize
+广告调用 `getMaxSize` 向 host 查询广告可能重置的最大尺寸（密度无关像素）。
+
+如果应运行在全屏设备上（覆盖状态栏），host 返回全屏维度。如果应用运行在比全屏小的设备上，此屏通用会为状态栏或其它应用之外的元素留有空间，host 将会返回包含此应用的视图的尺寸。
+
+|语法|getMaxSize()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：{width, height}，包含 webview 的最大宽高，此宽高为 webview 可以重置的最大的宽高。|
+|相关事件|无|
