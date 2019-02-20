@@ -1086,3 +1086,40 @@ expandProperties object = {
 |参数|无|
 |返回值|JavaScript 对象：{width, height}，包含 webview 的最大宽高，此宽高为 webview 可以重置的最大的宽高。|
 |相关事件|无|
+
+### 6.10 getScreenSize
+广告调用 `getScreenSize` 向 host 查询设备屏幕的尺寸，尤其是在扩展广告之前（如果是重置尺寸使用 `getMaxSize`）。host 返回当前设备屏幕的宽度和高度，单位为密度无关像素。
+
+设备方向改变时，此大小也会变化。比如，一个 640x960 的竖屏旋转后变为 960x640 的横屏。
+
+返回整个屏幕的尺寸，包含为状态或系统栏保留的区域和其它应用控制的区域。广告必须使用 6.9 节介绍的 `getMaxSize()` 查找应用有多少可用于展示广告的区域。
+
+|语法|getScreenSize()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：{width, height} 包含基于设备方向的设备屏幕的宽度和和高度，单位为密度无关像素|
+|相关事件|无|
+
+### 6.11 get/set resizeProperties
+在广告执行重置尺寸之前，它可以调用 `getResizeProperties` 向 host 查询广告容器为当前重置尺寸操作的相关设置。然后广告可以调用 `setResizeProperties` 去更新 `resizeProperties` 对象。当广告调用 `resize()` 时，host 使用此对象中的属性集来调用广告容器。
+
+如果展示的是 `resizeProperties` 对象的一种示例：
+```
+resizeProperties object = {
+    "width": integer,
+    "height": integer,
+    "offsetX": integer,
+    "offsetY": integer,
+    "customClosePosition": string,
+    "allowOffscreen": boolean
+}
+```
+`resizeProperties` 对象中的属性含意如下：
+|属性|描述|
+|---|---|
+|width*|integer: 宽度，单位为密度无关像素，代表广告容器必须重置的宽度|
+|height*|intger: 高度，单位为密度无关像素，代表广告容器必须重围的高度|
+|offsetX*|integer: 水平方向上，当前左上角位置相对目标广告容器左上角位置的偏差。正整数为向右移动，负整数为向左移动。|
+|offsetY*|integer: 垂直方向上，当前左上角位置相对目标广告容器左上角位置的偏差。正整数代表向下移动，负整数代表向上移动|
+|customClosePosition|在 MRAID 3.0 中已过时。host 总会将关闭指示器放到右上角|
+|allowOffscreen|boolean: 指明重置大小的广告容器是否一定被允许显示部分或完全不显示。<br/>**true:** |
