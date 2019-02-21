@@ -1122,4 +1122,33 @@ resizeProperties object = {
 |offsetX*|integer: 水平方向上，当前左上角位置相对目标广告容器左上角位置的偏差。正整数为向右移动，负整数为向左移动。|
 |offsetY*|integer: 垂直方向上，当前左上角位置相对目标广告容器左上角位置的偏差。正整数代表向下移动，负整数代表向上移动|
 |customClosePosition|在 MRAID 3.0 中已过时。host 总会将关闭指示器放到右上角|
-|allowOffscreen|boolean: 指明重置大小的广告容器是否一定被允许显示部分或完全不显示。<br/>**true:** |
+|allowOffscreen|boolean: 指明重置大小的广告容器是否一定被允许显示部分或完全不显示。<br/>**true:** 允许超出屏幕；尽管会导致广告位置会在屏幕外，但 host 必须避免复位广告容器。**false:** 禁止超出屏幕，（当超出屏幕时）host 会尝试复位广告容器，之后广告会在 maxSize 属性指定的区域内展示。|
+*：代表必选项。如果广告调用 `resize()` 之前没有使用 `setResizeProperties` 设置值的话，host 会保持原始设置并发送一个错误（error）。
+
+**当重置尺寸导致超出屏幕时**
+
+当 `allowOffscreen` 属性设置为 'false' 时，host 会尝试在 `maxSize` 对象定义的尺度下复位重置尺寸的创意。例如，如果广告放到了屏幕的上方，之后广告向上扩展 50 像素，在执行重置尺寸之前，host 会将广告向下移动 50 像素。
+
+相同的情况下，当 `allowOffscreen` 设置为 'true' 时，重置广告的上边会超出屏幕外 50 像素。
+
+`allowOffscreen` 属性不能解决所有的放置问题。比如，一个广告在成功在横屏方向重置后，接着为（展示）更大的广告改变屏幕方向，此时，设置 `allowOffscreen` 为 'false' 是无用的。
+
+可重置尺寸的广告在正式投放到应用展示之前一定要测试其质量。如果 host 无法正确执行广告传回的重置数值，host 会发送一个错误。
+
+**检查并设置重置尺寸属性**
+
+广告使用 `getResizeProperties` 向 host 查询当前重置属性值。host 返回 `resizeProperties` 对象。
+
+|语法|getResizeProperties()|
+|---|---|
+|参数|无|
+|返回值|JavaScript 对象：{width, height} 包含重置尺寸的属性|
+|相关事件|无|
+
+广告使用 `setResizeProperties` 来改变 `resizeProperties` 对象中的值。host 使用广告提供的值为替换 `resizeProperties` 对象的值。
+
+|语法|setResizeProperties(properties)|
+|---|---|
+|参数|JavaScript 对象：包含重置广告的宽度、高度、关闭位置、偏移方向（单位均为密度无关像素）以及广告是否可以超出屏幕。|
+|返回值|无|
+|相关事件|无|
