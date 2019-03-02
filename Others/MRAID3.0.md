@@ -1178,3 +1178,159 @@ resizeProperties object = {
 一定 **不要** 使用 HTML5 API 中的定位内容替换上面说的内容。
 
 当经纬度属性不可用或根据用户要求不允许使用时，getLocation() 方法必须设法传递 "-1" 错误信息。
+
+## 7 事件
+事件用来上报行为，此行为表示 webview 状态发生改变或确认 webview 状态发生改变。host 将事件发送给 activity 继而给广告。广告必须创建特定事件监听器来监听事件。
+
+### 7.1 错误（error）
+当 host 无法执行广告调用的方法时，host 发送一个错误，表示方法调用失败。广告必须注册监听器才能接收错误事件。可以为不同类型的错误设置监听器，以便广告可以响应所需要的事件。
+
+一个 `error`  事件提供两个参数：一个是错误信息，一个是未遂行为在什么时间发生的。这两个参数都是可选的并且错误信息项经常在创意调试阶段使用。
+
+以下任何 MRAID 行为都可能会发生错误：
+
+* addEventListener
+* createCalendarEvent
+* close
+* expand
+* getCurrentPosition
+* getDefaultPosition
+* getExpandProperties
+* getLocation
+* getMaxSize
+* getPlacementType
+* getResizeProperties
+* getScreenSize
+* getState
+* getVersion
+* isViewable
+* open
+* playVideo
+* removeEventListener
+* resize
+* setExpandProperties
+* setResizeProperties
+* storePicture
+* supports
+* useCustomClose
+
+尽管广告可以为多种上述中提到的行为注册错误监听，但是一般这三个方法最有可能出现错误： `resize()`, `storePhoto()` 和 `createCalendarEvent()`。广告必须为这些错误注册监听器并且可以正确响应这些错误。
+
+因为 host 可以同步或异步处理错误，广告开发者必须考虑当错误发生时用哪种方式处理。
+
+|语法|"error" funtion(meesage, action)|
+|---|---|
+|参数|message: String, 发生的错误的描述信息<br/>action: String，错误发生时，未遂的 MRAID 行为的名称|
+|被触发|任何可以发生错误的事|
+
+### 7.2 ready
+广告加载之前，host 必须确保 MRAID 库可用，如此广告才能在 host 发送事件上调用或注册监听器。至少，广告容器必须尽早支持 `getState()` 和 `addEventListener()` 方法。没有这两个函数，广告不能为 host 的 ready 事件注册监听器。
+
+理想情况下，ready 事件只在所有 MRAID 方法在容器中都被支持并且 host 能从广告接收 任何 MRAID 的调用之后再发送。
+
+广告必须等到 host 发送 ready 事件后，然后在执行任何富媒体操作之前都检查容器是否准备就绪。在此种情况，host 在广告注册监听之前就已经发送 ready 事件，广告必须使用 `getState()` 配合 ready 事件，以下是示例：
+```
+function showMyAd() {
+    ...
+}
+
+if (mraid.getState() === 'loading') {
+    mraid.addEventListener('ready', showMyAd);
+} else {
+    showMyAd();
+}
+```
+
+当广告容器加载好，初始化完并可以接收来自广告的请求时，host 发送 `ready` 事件。此时代表广告可以使用 MRAID JavaScript 库了。
+
+|语法| "ready" |
+|---|---|
+|参数|无|
+|被触发|容器完全加载好，初始化完且准备好接收任何来自广告的调用|
+
+### 7.3 sizeChange
+
+无论何时广告容器为响应转换方向，广告重围尺寸请求或广告扩展请求而改变尺度时，host 都会发送 `sizeChange` 事件。事件包含新的宽度和高度，单位为密度无关像素。
+|语法|"sizeChange" function(width, height)|
+|---|---|
+|参数|width: 数字，view 的宽度<br/>height: 数字，view 的高度|
+|被触发|由于重围尺寸，扩展，关闭，转换或应用注册一个 "size" 事件监听器导致广告容器宽或高发发生变化时触发|
+
+### 7.4 staeChange
+无论何时，广告容器状态为响应来电或环境改变而发生改变时，host 都会发送 `stateChange` 事件。
+
+广告容器可能存在的状态：
+
+* loading
+* default
+* expanded
+* resized
+* hidden
+
+广告容器状态可能会由以下原因而改变：host 初始化（加载）；用户发起关闭或其它应用交互，如 window 重置、旋转；广告调用 `expand()`, `resize()` 或 `close()`。查看 4.2.1 小节了解广告容器状态以及它们如何改变的。
+
+广告可以使用 `getState` （6.6 节有介绍）向 host 查询广告容器的当前状态。
+
+|语法|"stateChange" function(state)|
+|---|---|
+|参数|state: String 代表 "loading", "default", "expanded", "resized" 或 "hidden"|
+|被触发|`expand()`, `close()` 或应用改变 webview 的状态|
+
+
+### 7.5 exposureChange
+`exposureChange` 事件是 MRAID 3.0 加入的，为了能更准确反映可见性。
+
+two-part 广告不支持 exposureChange 事件。
+
+广告注册 `exposureChange` 事件监听器时，host 此广告的向所有监听器异步发送初始曝光状态事件。初始事件之后，host 会在任何曝光区域发生变化时发送 `exposureChange` 事件。 `exposureChange` 值 0.0（0）代表当前广告容器不在 view 中或移到后台了。广告容器或其它父 view 滚动，移动或遮挡时，会发生 `exposureChange` 事件。由于应用或 UI 变化导致广告可见性发生变化时，host 也会上报 `exposureChange` 事件。
+
+即使可见性百分比没有变化，只要广告曝光区域发生变化时，host 就必须发送 `exposureChange` 事件。比如，重置尺寸，展示或隐藏插屏广告，banner 扩展到全屏，banner 广告被添加到 window 上。这此曝光变化提升广告重新计算基于更新广告尺寸的可见性测量。
+
+host 可以通过原生事件句柄(handling)或在原生层轮询的方式实现 `exposureChange` 事件。
+
+|语法|"exposureChange" function(exposedPercentage, visibleRectangle, occlusionRectangles)|
+|---|---|
+|参数|exposedPercentage: 广告展示在屏幕上的百分比，一个 0.0 到 100.0 浮点型数字，0.0 代表不可见<br/>visibleRenctangle: 广告容器的可见部分，为 null 时不可见。它包含 {x, y, width, height}，x 和 y 代表相对于广告容器左上角的可见部分的左上角位置，width 和 height 代表可见区域的尺寸。如果可见区域不是矩形，这个参数代表可见区域的最大矩形区，`occlusionRectangle` 参数描述此范围的不可见区域<br/><br/>`occlusionRectangles`: 一个矩形数组，包含 `visibleRectangle` 中不可见的部分，如果为 null 代表未使用遮挡检查。数组中每个元素包含 {x, y, width, height}，x 和 y 代表相对于当前存在的广告容器左上角的不可见区域的左上角位置，width 和 height 代表不可见区域的尺寸。这些矩形不能重叠，它们必须按面积从大到小排列。在常见场景中，可见区域为矩形的，此参数为 null。如果实现可以检测非矩形曝光，那么此参数会被设置。|
+|被触发|webview 的曝光区域发生变化。看下面如果触发 `exposureChange` 事件了解详情|
+
+示例方法
+```
+{
+    "exposedPercentage": 78,
+    "viewport": {
+        "width": 375,
+        "height": 667
+    },
+    "visibleRectangle":{
+        "x": 27.5,
+        "y": 65,
+        "width": 300,
+        "height": 50,
+        "occlusionRectangle": {
+            "x": 27.5,
+            "y": 65,
+            "width": 50,
+            "height": 50
+        }
+    
+```
+
+**触发 exposureChange 事件**
+
+在这些属性都为 true 时，广告认为被曝光：
+
+* 设置屏幕开起，未处理睡眠或锁屏状态
+* 应用在前台显示。前台应用是设置屏幕上活动的应用，用户可以交互。在 Android 上，Activity 在 `Activity.onResume()` 和 `Activity.onPause()` 之间处于前台状态；在 iOS 应用在 `UIApplicationDidBecomActiveNotification` 和 `UIApplicationWillResingActiveNotification` 事件之间处于前台状态。
+* 广告 view 至少有 1 像素在屏幕上，考虑到遮挡和被应用图层滚动。（此计算不需要考虑图层内 z 轴遮挡。）注意此与 MRAID 2.0 中指定的不同，2.0 中没有为可见广告设置任何像素阈值。
+* 没有模态接口阻塞广告。与其它应用内置模态屏幕一样，模态接口可能包含 MRAID 功能比如使用 `mraid.open()` 打开应用内容浏览器或应用市场，使用 `mraid.playVideo()` 播放视频，使用 `mraid.storePicture()` 访问相册以及使用 `mraid.createCalendarEvent()` 访问日历。
+
+如果这些情况有一个没有包括的，广告移出 view 且不可见。
+
+host 上报曝光变化，如下所示
+|情况|曝光变化|
+|---|---|
+|广告容器被曝光|exposureChange 事件携带一个非零百分比参数|
+|广告容器移出 view 或在其它 activity view 下面|exposureChange 事件携带一个零百分比参数|
+|广告容器从曝光变到移出 view|host 发送携带零（0）百分比参数的 exposureChange事件|
+|广告容器从移出 view 到曝光|host 发送携带非零百分比参数的 exposureChange 事件 |
+|广告容器状态或大小改变，但是曝光百分比不有变化|host 发送一个 exposureChange 事件，携带与上次上报一样的参数。|
