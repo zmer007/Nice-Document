@@ -1334,3 +1334,86 @@ host 上报曝光变化，如下所示
 |广告容器从曝光变到移出 view|host 发送携带零（0）百分比参数的 exposureChange事件|
 |广告容器从移出 view 到曝光|host 发送携带非零百分比参数的 exposureChange 事件 |
 |广告容器状态或大小改变，但是曝光百分比不有变化|host 发送一个 exposureChange 事件，携带与上次上报一样的参数。|
+
+### 7.6 audioVolumeChange
+
+host 使用 `audioVolumeChange` 上报音频声音百分比变化。音频音量可能许多不同控制因素控制，可能是应用自动调节，应用设定音量大小，设备静音或其它因素。如果应用不能播放音频，或它不能检测音量大小，此事件上报 null 而非一个百分比。
+
+|语法|"audioVolumeChange" function(volumePercentage)|
+|---|---|
+|参数|volumePercentage: 最大音量的百分比，是 0.0 到 100.0 之间的浮点型数字，0.0 代表不允许出声，null 代表无法检测到音量|
+|被触发|广告音量变化时触发|
+
+当广告注册 `audioVolumeChange` 事件后，初始化完音频音量后，host 向广告的所有监听器异步发送此事件。初始化事件之后，当音量发生变化时，host 上报 `audioVolumeChange` 事件。
+
+音量变化的典型实例是当用户改变设备音量或静音设备。当应用或 UI 转变导致音量焦点发生变化时，host 也要上报音量变化。多个音频变化事件可能使用同一个百分比值上报。
+
+host 可能通过原生事件句柄或轮询原生播放器的方式检测音量。如果原生播放器使用轮询方式，当音量变化时，它发送 `audioVolumeChange` 事件的间隔不能多于一秒。
+
+音量变化事件不受广告的控制。广告可以对声音进行一定控制，如静音。直接发生在广告上的音量控制不会反映到 `audioVolumeChange` 事件。
+
+在某些情况下，当广告没有播放音频时，host 可能无权使用音量。另外，host 可能不能得知音频是静音或没有播放，比如，当静音键打开但耳麦还在工作。在此情况下，在广告播放之前，host 上报一个 null `volume_Percentage` 事件，之后再上报另一个携带音量数字的 `audioVolumeChange` 事件，在播放开始之后 host 就可以监测音量。
+
+**使用示例**
+
+当 host 提供除 MRAID 中的其它特性的 `audioVolumeChange` 事件时，广告将能检测可听性。广告可能使用如下伪代码：
+
+1. 注册 `audioVolumeChange` 事件监听器。比如，
+```
+mraid.addEventListener('audioVolumeChange', handleVolumeChange);
+```
+2. `audioVolumeChange` 处理器可能使用一个阈值对比音量，当到达阈值时记录时间：
+```
+function handleVolumeChange(volume_percentage) {
+    if (volumePercentage && volumePercentage >= 10.0) {
+        // 记录听到音量的时间 。。。
+    }
+}
+```
+3. 当广告不再需要监听声音时，移除 `audioVolumeChange` 监听器。比如：
+```
+mraid.removeEventListener('audioVolumeChnage', handleVolumeChange);
+```
+
+**实现注意项**
+
+JavaScript 事件驱动 API 覆盖一个状态 API（如，`getAudioVolume()`），原因如下：
+
+* 在 JavaScript 中调用 `getAutioVlume()` 状态立即从原生层获取数值可能阻塞 webview 执行线程，影响原生性能。
+* 为了防止调用 `getAudioVolume()` 状态阻塞 JavaScript 线程，原生层应用检查音量（并缓存结果）无论创意是否使用此值。通过使用事件接口，只有对需要音量控制的广告才会承担检测声音带来的损耗。
+* 此事件可避免在 JavaScript 层轮询
+* 在 `audioVolumeChange` 事件之外添加 `getAudioVolume()` 状态 API 是多余的。创意的 JavaScript 脚本可以基于它的此事件的句柄轻易实现这种方法
+
+**Android**
+
+在 Android 上，`android.media.AudioManager` 类提供了访问设备音量的方法。此值必须在展示广告的 webview 获取焦点时进行控制。下面伪代码将返回设备音量。
+
+```
+Double getAudioVolumePercentage() {
+    if (!adHasAudioFocus()) return null;
+    AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+    int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+    int maxVolume = audioManager.getStreamMaxVlume(AudioManager.STREAM_MUSIC);
+    return new Doule((100.0 * currentVolume) / maxVolume);
+}
+```
+伪代码中的 `adHasAudioFocus()` 方法可以调用 MRAID 实现的检测音频聚焦和 activity 处于后台的处理句柄。
+
+**iOS**
+在 iOS 上，`AVAudioSession` 类提供了访问设备音量的方法。然而，此音量只有当应用音量聚焦时才有效。下面伪代码将返回设置音量。
+```
+-(NSNumber*)getAudioVolumePercentage {
+    if (![self adHasAudioFocus]) return nil;
+
+    return @(100.0 * [AVAudioSession sharedInstance].outputVolume);
+}
+```
+伪代码中的 `adHasAudioFocus` 方法将调用 MRAID 实现检测音频会话（session）与应用后台的处理句柄。
+
+### 7.7 viewableChange(过时)
+
+`viewableChange` 事件在 MRAID 3.0 中过时，并有可能在未来版本的 MRAID 移除。然而，在 MRAID 3.0 的 host 实现中必须支持 `viewableChange` 事件以维持向后兼容性。当广告容器从在屏幕上移到不在屏幕上或不在屏幕上移到在屏幕上时，host 发送 `viewableChange` 事件。任何情况下，容器都有可能被卸载出屏幕，广告在执行任何造型时，都应该注册并通过 `viewableChange` 检测它的可见状态。
+|语法|"viewableChange" function(boolean)|
+|---|---|
+|参数|true: 容器在屏幕上，用户可见；false: 容器不在屏幕上，不可见|
+|被触发|应用 view 容器改变时触发|
