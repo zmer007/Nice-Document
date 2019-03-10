@@ -1417,3 +1417,90 @@ Double getAudioVolumePercentage() {
 |---|---|
 |参数|true: 容器在屏幕上，用户可见；false: 容器不在屏幕上，不可见|
 |被触发|应用 view 容器改变时触发|
+
+## 使用设备特性
+
+MRAID 可以提供移动设备特性，如定位，方向，存储图片，日历和视频播放器等。下面章节将介绍使用这些特性开发广告的指南和示例。
+
+### 8.1 设备方向
+
+广告不应使用 window.orientation 来检测方向，也不应用使用 orientationChange 事件来检测方向变化。在新的系统版本上，host 不能控制 webview 提供的方向更新信息，有时 webview 提供的方向信息是不准确的。
+
+广告必须使用 mraid.getCurrentPosition() 而非 windown.orientation 来检测方向，并且对比宽高值确定横竖屏布局；在布局发生变化时，广告必须使用 mraid.getCurrentPosition() 在 sizeChange 事件中上报的宽高来验证广告的方向，而非使用 orientationChange 事件。
+
+当广告没有控制尺寸时，应当使用 MRAID 3.0 提供的 getOrientationProperties 特性来检测方向。6.3 节有 orientationProperites 对象的讲解。
+
+### 8.2 存储图片
+富媒体广告设计者可能希望向广告运行的设备的相册中保存图片。这样可能对很多的特性都有帮助，包括保存之后要使用的优惠券。
+
+**storePicture** 方法
+
+storePicture 方法将会向设备相册中存入一张图片。此图片可能来自本地或网络。为保证用户知道有张图片添加到相册中，每存一张图片 MRAID 都需要 SDK / 容器使用系统级的句柄（hanmdler）来向用户展示一个模态对话窗，用户使用对话窗确认或取消保存。如果设备没有原生 “添加图片” 的确认句柄，SDK 必须认定这些设备为不支持 storePicture 功能。
+
+此方法将存储指定 URI 代表的图片或其它媒体类型。
+
+符合 MRAID 标准的容器支持通过 HTTP 重定向（为了统计）的方式保存图片，然而容器可能不支持元重定向。
+
+由于用户取消或其它任何原因导致添加图片失败了，都应该反馈一个错误。
+
+storePicture(URI)
+
+参数：
+ * URI String: 图片或其它媒体资源的 URI
+ * 相关事件：无
+
+### 8.3 日历事件
+createCalendarEvent 方法会打开设备相关界面创建一个日历事件。当日历界面展示时，广告应被暂停。符合 MRAID 标准的容器必须调用设备原生的 “创建日历事件” 面板，添入广告提供的数据，以保证创建日历事件是用户发起并授权的。如果设备不支持 “创建日历事件” 面板，SDK 必须认定此设备不支持添加日历事件。
+
+日历事件数据必须按 W3C 日历指定的 JavaScript 对象的格式传递。看附录。
+
+如果用户取消或创建日历事件失败，必须要报一个错误。
+
+createCalendarEvent(parameters)
+
+参数:
+ * parameters: JavaScript Object{...}：此对象包含日历实体的参数，根据 W3C 指定的日历实体写就的。看附录。
+
+返回值：
+ * 无
+
+相关事件：
+ * 无
+
+例如，以下将添加一个日历事件代表：玛雅启示 / 起始于东部时间 2012 年 12 月 21 日午夜，终止于东部时间 2013 年 12 月 22 日午夜发生在每个角落的时世界末日。
+
+```
+createCalendarEvent({description: "Mayan Apocalypse/End of World", location: "everywhere", start: "2012-12-21T00:00-05:00", end: "2012-12-22T00:00-05:00"})
+```
+
+
+### 8.4 视频
+设备中的视频可以使用内联播放（webview 或系统浏览器播放），也可以使用原生播放器播放。对许多广告来说，内联播放更可取：它破坏观看者体验较少，并且在 webview 中播放支持 HTML5 上报创意播放进度指标。当视频在原生播放器中播放时，这些指标一般很难获取，或不能获取。
+
+广告设计者必须牢记设备/系统限制可能阻止内联播放（这些情况时发生在 Android 2.x 及更早版本）。
+
+然后，如果可以的话，支持 MRAID 的容器必须支持内联播放，允许广告设计者指定使用内联或分离的播放器播放。广告设计者可用 "supports("inlineVideo")" 方法判断运行的设备是否支持创意使用内联方式播放视频。
+
+为了可以使用内联播放并自动播放视频，符合 MRAID 标准的 SDK 必须向 webivcew 插入任何必须的依赖设备操作系统的标签。
+
+对于 iOS 设备，如下标签必需设置：
+
+ * webView.mediaPlaybackRequiresUserAction = NO;
+ * webView.allowsInlineMediaPlayback = YES;
+
+对于 Android（3.0 及以上版本） 来说， SDK 必需调用硬件加速功能。将硬件加速功能添加到 WindowManager:
+
+ * getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, WindowManager.FLAG_HARDWARE_ACCELERATED);
+ 
+对于 Android 2.x 及之前版本，不能使用内联方式播放视频。原生播放器会被 playVideo 方法调起。
+
+**playVideo** 方法
+使用此方法在设备的原生外置播放器播放视频。注意，此方法纯粹为存在外置播放器的系统提供方便，不支持分离的基于 SDK 的视频播放器。使用 HTML5 video 标签内联播放视频（设备支持此特性）
+
+playVideo(URI)
+
+参数：
+ * URI String，视频或视频流的 URI
+
+返回值：
+ * 无
