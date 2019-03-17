@@ -1635,3 +1635,173 @@ css_pixels * viewport_scale = density_independent_pixels
 **Webview：** 基于 HTML 的指示器（viewer），可以展示广告创意。webivew 用来渲染包含 HTML 及 Javascript-enabled 的广告。
 
 ![screen-container-webview-adcreative](../resource/screen-container-webview-adcreative.png)
+
+## 11 附录：W3C CalendarEvent 接口
+
+来自：W3C Calendar API，4.3 及 4.4 节。
+
+W3C 工作草案 2011 年 4 月 19 日
+
+这个版本：
+```
+http://www.w3.org/TR/2011/WD-calendar-api-20110419/
+```
+
+最新发布版本：
+```
+http://www.w3.org/TR/calendar-api/
+```
+
+最新编辑器草案：
+```
+http://dev.w3.org/2009/dap/calendar/
+```
+
+编辑器：
+
+[Richard Tibbett](http://richt.me/), [Opera Software ASA](http://www.opera.com/), Suresh Chitturi, [Research in Motion(RIM)](http://www.rim.com/)
+
+版权 @ 2011 [W3C](http://www.w3.org/)([MIT](http://www.csail.mit.edu/),[ERCIM](http://www.rim.com/), [Keio](http://www.keio.ac.jp/))，保留所有权。W3c [liability](http://www.w3.org/Consortium/Legal/2002/ipr-notice-20021231#Legal_Disclaimer), [trademak](http://www.w3.org/Consortium/Legal/2002/ipr-notice-20021231#W3C_Trademarks) 和 [document use](http://www.w3.org/Consortium/Legal/2002/ipr-notice-20021231#W3C_Trademarks) 应用规则。
+----
+4.3 CalendarEvent 接口
+
+此 CalendarEvent 接口捕获一个日历事件对象。
+
+当前使用 DOMString 数据和时间来代表时区事件[被认为是不够的](http://www.w3.org/2009/dap/track/issues/81)。作用于位置的组限制，寻找 TZData 对象的开发将在这里。
+```
+[NoInterfaceObject]
+
+interface CalendarEvent {
+    readonly attribute DOMString        id;
+    attribute DOMString     description;
+    attribute DOMString?        location;
+    attribute DOMString?        summary;
+    attribute DOMString     start;
+    attribute DOMString?        end;
+    attribute DOMString?        status;
+    attribute DOMString?        transparency;
+    attribute CalendarRepeatRule?       recurrence;
+    attribute DOMString?        reminder;
+}
+```
+
+4.3.1 属性
+
+**description** DOMString 类型
+
+描述一个事件。
+```
+{description: "Meeting with Joe's team"}
+```
+无它（没有其它参数）
+
+**end** DOMString 类型，可为空
+事件结束日期，是一个有效数据或日间串。
+```
+{end:'2011-03-24T 10:00:00-08:00'} // 事件结束于 2011 年 5 月 24 日下午 6 点（UTC）
+```
+无它
+
+**id** DOMString 类型，只读
+
+一个全局唯一标识给定 CalendarEvent 对象的标识。每个引用日历的 CalendarEvent 都必须有一个非空的 id 值。
+
+当一个日历事件添加到或展示在日历中时，id 必须保证全局唯一。
+
+可以使用 IANA 注册的标识格式作为一种实现。此值也可以是一个非标准的格式。
+
+无它
+
+**location** DOMString 类型，可为空
+
+一个描述事件地点的纯文件。
+```
+{location: 'Conf call #+44020000001'}
+```
+
+无它
+
+**recurrent** CalendarRepeatRule 类型，可为空。
+
+此事件周期或重复规则
+```
+{recurrence: {frequency: 'daily'}} // Event occurs every day and never expires
+{recurrence: {frequency: 'weekly', // Event occurs weekly...
+daysInWeek: [2, 4], // ...every Tuesday and Thursday
+expires: '2011-06-11T12:00:00-04:00'}} // Event expires on or before June 11,
+2011 @ 4pm (UTC)
+{recurrence: {frequency: 'weekly', // Event occurs weekly...on every
+Wednesday
+// (if we say the 'start' attribute is March 24, 2011 @ 2pm
+(Wednesday) as
+// shown above and no daysInWeek attribute is
+provided)
+expires: '2011-06-11T11:00:00-05:00'}} // Event expires on or before June 11,
+2011 @ 4pm (UTC)
+{recurrence: {frequency: 'monthly', // Event occurs monthly...
+daysInMonth: [-5], // ...5 days before the end of each month
+expires: '2011-06-11T20:00:00+04:00'}} // Event expires on or before June 11,
+2011 @ 4pm (UTC)
+{recurrence: {frequency: 'monthly', // Event occurs monthly...on the 24th day of
+every month
+// (if we say the 'start' attribute is March 24, 2011 @ 2pm
+as
+// shown above and no daysInMonth attribute is
+provided)
+expires: '2011-06-11T20:00:00+04:00'}} // Event expires on or before June 11,
+2011 @ 4pm (UTC)
+{recurrence: {frequency: 'yearly', // Event occurs yearly...on the 24th day of
+every March
+// (if we say the 'start' attribute is March 24, 2011 @ 2pm
+as
+// shown above and no daysInMonth attribute is
+provided)
+expires: '2011-06-11T16:00:00+00:00'}} // Event expires on or before June 11,
+2011 @ 4pm (UTC)
+{recurrence: {frequency: 'yearly', // Event occurs yearly...
+daysInMonth: [24], // ...every 24th day...
+monthsInYear: [3, 6], // ...in every March and June
+expires: '2011-06-11T16:00:00Z'}} // Event expires on or before June 11, 2011 @
+4pm (UTC)
+{recurrence: {frequency: 'yearly', // Event occurs yearly...
+daysInYear: [168], // ...every 168th day of each year
+expires: '2011-06-11T21:45:00+05:45'}} // Event expires on or before June 11,
+2011 @ 4pm (UTC)
+```
+无它
+
+**start** DOMString 类型
+
+事件开始日期
+```
+{start:'2011-03-24T09:00-08:00'}
+```
+无它
+
+**status** DOMString 类型，可为空
+
+一种指示此事件的用户状态。
+
+此参数有如下几种值：'pending', 'tentative', 'confirmed', 'cancelled'。
+```
+{status: 'pending'} // 事件正在等待用户动作
+```
+无它
+
+**summary** DOMString 类型，可为空
+
+事件摘要
+```
+{summary:'Agenda:\n\n\t* Introductions\n\t* AoB'}
+```
+无它
+
+**transparency** DOMString 类型，可为空
+
+展示事件设置的状态的一个指示
+
+此参数有如下几种值：'transparent', 'opaque'。
+```
+{freebusy: 'transparent'} // 标记事件在日历中透明
+```
+无它
