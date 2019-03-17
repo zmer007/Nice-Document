@@ -1504,3 +1504,98 @@ playVideo(URI)
 
 返回值：
  * 无
+
+## 9 VPAID 事件与方法
+
+MRAID 处理富媒体广告与应用或 webview 的交互。当广告包含视频组件时，host 可以指示如何处理广告中的视频播放事件，追踪视频进度和用户体验。
+
+IAB 的数字流视频播放广告接口标准（VPAID，Video Player-Ad Interface Definition）是一个在广告与视频播放器之前的一个接口。MRAID 2.0 附录中介绍如何初始化 VPAID 并上报某些事件。MRAID 3.0 将此内容及一些其它可选规范集成到 MRAOID 3.0 上了，支持 MRAID 3.0 的 host 将同时支持开发广告的 MRAID 和 VPAID 标准。
+
+VPAID 与 MRAID 集成标准不处理广告与播放器之间的交互。此集成标准使 MRAID host 可以监听 VPAID 事件。
+
+### 9.1 MRAID 广告中的 VPAID  交互
+
+下图解释了 VPAID 视频在 MRAID 创意中的交互进程。
+![vpaid-in-mraid-progress](../resource/vpaid-in-mraid-progress.png)
+
+#### 9.1.1 在 MRAID 上下文中初始化 VPAID
+
+MRAID/VPAID 广告使用第 3 节讲的机制进行初始化。一旦容器返回 'ready' 事件或设置容器状态为 'default' 时，广告就可以检查容器是否支持 vpaid 标准了。
+
+可以使用 mraid.supports() 方法以 'vpaid' 作值来检查是否支持 VPAID，格式如下
+
+```
+mraid.supports("vpaid")
+```
+
+MRAID 3.0 中支持 VPAID 是可选的，但是支持 MRAID 3.0 的应用需要返回一个布尔值：true 代表支持 VPAID，false 代表不支持。
+
+#### 9.1.2 发送与接收 VPAID 事件
+
+只要广告验证 host 支持 VPAID，广告必须调用 `mraid.initVpaid(vpaidObject)` 将 VPAID 对象传送给容器。之后 host 会订阅 VPAID 事件并且调用 `vpaidObject.startAd()` 方法。之后广告可以开始视频创意并发送相关 VPAID 事件。
+
+MRAID 上下文并非支持全部的 VPAID 事件。为避免与 MRAID 指令重复或冲突，只有以下 VPAID 方法与事件会被支持。当 host 支持 VPAID 集成时，VPAID 方法可以使用 vpaidObject 调用（如，`vpaidObject.subscribe()`）。在 MRAID 中使用 VPAID 方法的细节请查看 5.13 节。
+
+|支持 VPAID 方法|不支持 VPAID 方法|
+|---|---|
+|* subscribe()<br/>* unsubscribe()<br/> * getAdDuration()<br/> * getAdRemainingTime()<br/> * startAd()|* handshakeVersion<br/> * initAd()<br/> * resizeAd()<br/> * stopAd()<br/> * pauseAd()<br/> * resumeAd()<br/> * expandAd()<br/> * collapseAd()<br/> * skipAd|
+
+|支持 VPAID 事件|不支持 VPAID 事件|
+|---|---|
+|* AdClickThru<br/> * AdError<br/> * AdImpression<br/> * AdPaused<br/> * AdPlaying<br/> * AdVideoComplete<br/> * AdVideoFirstQuartile<br/> * AdVideoMidpoint<br/> * AdVideoStart<br/> * AdVideoThirdQuartile|* AdDurationChange<br/> * AdExpandedChange<br/> * AdInteraction<br/> * AdLinearChange<br/> * AdLoaded<br/> * AdLog<br/> * AdRemainingTimeChange(Deprecated in VPAID 2.0)<br/> * AdSizeChange<br/> * AdSkippableStateChange<br/> * AdSkipped<br/> * AdStopped<br/> * AdUserAccept Invitation<br/> * AdUserClose<br/> * AdUserMinmize<br/> * AdVolumeChange|
+
+任何未在此列出的 VPAID 方法与事件都不会被 MRAID 所支持。列举的这些方法与事件应用辅助 MRAID 创意的任意视频部分的交互。
+
+#### 9.1.4 VPAID AdClickThru 事件
+在 VPAID 中，广告创意使用 `AdClickThru` 事件传递点击某一链接（clickthrough）URL，此事件必须能被处理。VPAID 提供三个对数来定义 URL(url)，一个追踪用的 ID，一个布尔值，用来定义播放器或广告创意是否必须打开此 URL(playerHandles)。MRAID 容器必须忽略这些参数并且广告要用 host 中的 `mraid.open()` 方法来处理视频点击某链接事件。
+
+#### 9.1.5 VPAID AdPause, AdPlaying 事件
+
+VPAID 中，`AdPause` 和 `AdPlaying` 事件用来响应播放器命令 `pauseAd()` 和 `resumeAd()`。然后，在 MRAID 上下文中，还没有此命令，所以当 `AdPaused` 和 `AdPlaying` 事件发生时，会被通知给 host。
+
+#### 9.1.6 运行视频自动播放
+
+为支持最佳视频体验，webview 必须支持内联并自动播放视频。广告创意中的视频元素必须做到无用户交互也可以自动内联播放。
+
+iOS 设置参数以支持自动开始的说明已经包含在 MRAID 说明书中了，在提供额外信息来内联播放的下面。容器支持此附件必须向 webview 添加自动开始支持。
+
+如果给定的设备，操作系统或应用不支持自动开始，那么容器必须返回 `mraid.supports("vpaid")` 值为 'false', 如此广告创意可以播放视频内容的无交互版本，允许用户手动或采取其它方法初始化视频播放。
+
+然后要注意，视频广告需要手动播放应该当作一个极端例子，广告商必须确定发布者、网络广告服务商投放到系统版本不支持自动开始时才能采取手动播放。
+
+### 9.2 点击链接行为及可视性
+
+当用户点击广告时，容器使用 MRAID 的 `open()` 方法在应用中打开一个新浏览器容器，如 iOS 中的SFSafariViewController 或 WKWebView 或 Android 中的自定义标签或发送到向用户设备默认浏览器。在新窗口中，容器没有任何方法从广告的 webview 向新浏览器窗品传递信息。同样地，当用户关闭新浏览器窗口返回到起初窗口时，容器也获取不到任何指示。因为新浏览器窗口的盲点，创意可能不知道什么时候暂停动画或视频元素。MRAID 3.0 使用 `exposureChange` 事件来上报曝光度变化。此事件通过 `exposedPercentage` 和 `occlusionRectangle` 参数上报曝光变化。
+
+链接点击事件流程应如下：
+
+1. 请求 URL 来展示（此可以来自主广告或来自某个交互状态），广告调用 `mraid.open()` 方法
+2. 容器在内应内打开一个新浏览器窗口或打开设备默认浏览器并触发 `exposureChange()` 方法。新浏览器窗口应用包含一个关闭按钮，可能包含其它控制器，如返回按钮或返回到应用的指示器。
+3. 调用 `mraid.open()` 方法，如果创意向 host 注册过，则必须触发 VPAID `AdClickThru` 事件，因此集成层可以使用 VPAID 追踪点击。
+4. 如果广告暂停视频，广告必须触发 VPAID `AdPaused` 事件。
+5. 当新浏览器窗口关闭或用户从默认浏览器返回到应用时，容器必须发送 `exposureChange()` 来报告新的 `exposedPercentage` 和新的 `occlusionRectangle` 值。创意可以恢复执行。如果视频恢复播放了，必须发送 VPAID `AdPlaying` 事件
+
+### 9.3 展示记数（Counting Impressions）
+
+MRAID 和 VPAID 标准是为了管理广告与移动应用或移动 web 应用之间交互的技术规范。都没提供具体的测量记数的规范指导。但是，它们都说明了如何设计支持记数的测量指南。
+
+当广告是一个使用 VPAID 事件来记展示数的视频广告时，上报必须与最新 IAB 记数数据视频广告展示的说明一致。
+
+如下是一段来自 [Digital In-Stream Video Impression Measurement Guidelines](https://www.iab.com/wp-content/uploads/2015/06/dig_vid_imp_meas_guidelines_finalv2.pdf) 的摘要：
+
+> 一个有效的数据视频广告展示应该只在广告计数器（日志服务器）接收并响应来自客户端的追踪资源的 HTTP 请求时才被记数。此记数必须发生在初始化（视频）流，缓冲完成之后，而非刚链接到数字视频内容时。
+>
+> 特别指出，测量不应用发生在刚开始缓冲时。测量应该发生在广告刚开始展示在用户浏览器上，用户第一眼看到时。
+
+必须使用 VPAID 中 `AdImpression` 事件来记数流视频广告展示。如果广告是富媒体广告，可以使用 MRAID 中的 `adload` 来记数。在 MRAID 记数时，不需要 VPAID 的 `AdImpression` 事件，广告容器一定不要等着这个事件。
+
+下表展示了 6 种常见场景，包括 MRAID 广告视频组件及可能使用 VPAID 来记数视频展示的说明。
+
+|格式|描述或举例|MRAID placementType|是否报告 VPAID 事件|
+|---|---|---|---|
+|插页视频，不可跳过（non-dismissible）|比如，在游戏升级时的 pre-app 广告或插页视频广告|interstitial|是|
+|可跳过的 pre-roll|比如，一个 iPad 播放视频前且占据屏幕的 3/4 的 640x480 的区域|interstitial|是|
+|带结束页的 post-roll|比如，带有可交互结束页的15 秒 post-roll 视频展示完后停在屏幕上直到用户完毕广告|interstitial|是|
+|点击后可播放视频的简单 banner|比如，在新闻应用上的 300x250 的 banner 广告|inline|否|
+|点击后会扩展并播放视频的 banner|比如，点击 320x50 的 banner 后，调用 mraid.expand() 方法并在一个 `<video>` 元素中播放视频。视频结束后，广告结束。对于用户来说，这几乎与使用在 banner 中使用 mraid.playVideo() 有相同的体验；基础的 tap-to-video|inline|否|
+|不带点击扩展功能并提供网格视频的 banner|与上面的相似，但是当扩展时，取代创意展示立即播放视频的是展示一个网格，格子里有图片，每个图片代表一个视频。用户在关闭之前可以选择播放多次|inline|否|
