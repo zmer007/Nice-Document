@@ -1,0 +1,62 @@
+{
+    "id": "e3ded2c70e88731836029edd664d2bb7",
+    "platID": "20001",
+    "adLocationID": "",
+    "sdkVersion": "android3.6.1",
+    "device": {
+        "imei": "865737030418769",
+        "imsi": "460022440306223",
+        "androidId": "fde1bdda3e643152",
+        "idfa": "",
+        "mac": "02:00:00:00:00:00",
+        "model": "MIX 2",
+        "androidAdId ": "6c80e34b-9d2d-4469-9580-fdbd8f1521a8",
+        "plmn": "46002",
+        "w": 1080,
+        "h": 2030,
+        "dpi": 440,
+        "appVersion": "3.6.0",
+        "os": "0",
+        "osv": 26,
+        "make": "Xiaomi",
+        "devicetype": 0,
+        "dnt": 0,
+        "adt": 1,
+        "connectiontype": 3,
+        "orientation": 1,
+        "idfv": "",
+        "openudid": "",
+        "geo": {
+            "lat": "0.0",
+            "lon": "0.0",
+            "time": "0",
+            "type": 1,
+            "country": "cn",
+            "region": "",
+            "city": "",
+            "zip": ""
+        },
+        "local": "zh_CN",
+        "ua": "Mozilla\/5.0 (Linux; Android 8.0.0; MIX 2 Build\/OPR1.170623.027; wv) AppleWebKit\/537.36 (KHTML, like Gecko) Version\/4.0 Chrome\/78.0.3904.62 Mobile Safari\/537.36",
+        "wifiList": [],
+        "cellInfo": 0
+    },
+    "app": {
+        "appKey": "",
+        "slotID": "ecrf0m52",
+        "slotConfigID": 1346,
+        "appChannel": "",
+        "name": "YumiMediationSDK",
+        "ver": "",
+        "bundle": "com.fingersoft.hillclimb.noncmcc",
+        "paid": 0,
+        "storeurl": "",
+        "keywords": "",
+        "sspId": ""
+    },
+    "imp": [{
+        "id": "0",
+        "instl": 1,
+        "splash": 0
+    }]
+}
