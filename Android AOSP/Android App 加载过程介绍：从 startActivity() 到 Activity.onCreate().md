@@ -2,11 +2,9 @@
 
 zygote 首先会 fork 出一个叫做 SystemServer 的进程，许多核心服务（如 AMS, WMS, PMS 等）由 SystemServer 进行初始化。所有核心服务加载完毕后，系统已准备好加载应用程序了。zygote 会 fork 出第一个应用进行--桌面应用（Launcher）进行展示。
 
-下图描述从用户点击桌面图标到 `Activity.onCreate()` 回调过程中的关键步骤
+下图以 Android_8.0.0 版本为基础描述从用户点击桌面图标到 `Activity.onCreate()` 回调过程中的关键步骤
 
 ![from launcher click to onCreate callback](../resource/launcher2oncreate.jpg)
-
-上图是从网上找到的，内容来自 aosp 较早版本，好多代码已经被移除（ActivityManagerProxy, ActivityManagerNativeProxy）或者被标记过时（ActivityManagerNative），但是主体流程过程是没啥问题的。下面会以 Android_8.0.0_r36 源码为基础分析应用启动过程。
 
 ## 启动 Activity
 ### 模拟启动 TargetApp
@@ -244,25 +242,159 @@ final int startActivityMayWait(IApplicationThread caller, int callingUid,
 |inTask|null|具体作用未知，TaskRecord 是 ActivityStackSupervisor-ActivityStack-TaskRecord-ActivityRecord 关系中的一个组件，记录 task 信息|
 |reason|`"startActivityAsUser"`|作用未知|
 
+进入代码之前要先清楚 task 是如何管理 Activity 的，快速浏览 [Activity launchMode、回退栈与 affinity](https://blog.csdn.net/weixin_46221133/article/details/104172642) 了解大概后，还需要了解以下实体类
 
+|类|作用|
+|---|---|
+|Intent|代表一种意图，比如，启动一个 Activity，启动一个 Service，都是以 Intent 发起，根据 Intent 信息获取应用或系统中可以响应这个意图的组件|
+|ResolveInfo|Resolve 代表解析的意思。粗略地讲，可以把它看作从 AndroidManifest 文件中解析出来的某个组件实体类。这个解析过程是由 PackageMangerService 提供，PMS 根据 intent 和 resolveType 从 manifest 信息中解析出来。 ActivityInfo、ServiceInfo、ProviderInfo 都是它的成员变量|
+|ActivityInfo|Info 代表信息，是个静态概念，它是 activity 实体类。它是从 AndroidManifest 文件获取的信息，承载 `activity` 或 `receiver` 标签的所有属性。|
+|ActivityRecord|Record 代表记录，是个动态概念（与 ActivityInfo 相比），它也是 activity 实体类。不过，它更偏向“记录”，信息是时时变化的，比如，activity 从哪个 intent 得来，需要将信息传回哪个 activity；activity 在 task 中的位置；activity 上次保存的状态等。|
+|TaskRecord|与 ActivityRecord，TaskRecord 记录的是 task 的动态信息，它是 task 的实体类。它内部有个数据记录属于本 task 所有 ActivityRecord。|
+|ActivityStack|Stack 代表栈，看名字就能看出，它起栈的作用，内部元素是 activity。它存放到设备中所有的 activity, task 以及它们的排列方式。因为记录的是所有的 activity，所以它知道所有 activity 的状态。|
+|ActivityStackSupervisor|Supervisor 有管理员的意思，它的作用也就很显示了，操作 ActiviyStack，因为 ActivityStack 拥有所有的 activity，所以 ActivityStackSupervisor 就是管理所有 activity 了。它就是 AMS 的真正执行者|
+|Activity|感觉它名字起错了，叫 Controller 才合适，它等待 ActivityRecord 把所有信息处理完成后，会初始化一个 PhoneWindow 对象，此对象用于显示画面。此后就将内部逻辑交给 AMS，显示交到 WMS，Activity 在中间起调节作用，最主要的是给开发者一个简单的模型，方便开发。|
 
+现在可以看代码了
+```java
+// ActivityStarter.startActivityMayWait
+final int startActivityMayWait(IApplicationThread caller, int callingUid,
+        String callingPackage, Intent intent, String resolvedType,
+        IVoiceInteractionSession voiceSession, IVoiceInteractor voiceInteractor,
+        IBinder resultTo, String resultWho, int requestCode, int startFlags,
+        ProfilerInfo profilerInfo, WaitResult outResult,
+        Configuration globalConfig, Bundle bOptions, boolean ignoreTargetSecurity, int userId,
+        IActivityContainer iContainer, TaskRecord inTask, String reason) {
+    
+    ...
 
+    // 从 PMS 获取目标 intent 的解析信息（resolve info）
+    ResolveInfo rInfo = mSupervisor.resolveIntent(intent, resolvedType, userId);
+    
+    ...
 
+    ActivityInfo aInfo = mSupervisor.resolveActivity(intent, rInfo, startFlags, profilerInfo);
 
+    ActivityOptions options = ActivityOptions.fromBundle(bOptions);
+    // 根据上文可知 iContainer 为 null
+    ActivityStackSupervisor.ActivityContainer container =
+            (ActivityStackSupervisor.ActivityContainer)iContainer;
+    synchronized (mService) {
+        if (container != null && container.mParentActivity != null &&
+                container.mParentActivity.state != RESUMED) {
+            return ActivityManager.START_CANCELED;
+        }
+        final int realCallingPid = Binder.getCallingPid();
+        final int realCallingUid = Binder.getCallingUid();
+        int callingPid;
+        if (callingUid >= 0) {
+            callingPid = -1;
+        } else if (caller == null) {
+            callingPid = realCallingPid;
+            callingUid = realCallingUid;
+        } else {
+            callingPid = callingUid = -1;
+        }
 
+        final ActivityStack stack;
+        if (container == null || container.mStack.isOnHomeDisplay()) {
+            stack = mSupervisor.mFocusedStack;
+        } else {
+            stack = container.mStack;
+        }
+        stack.mConfigWillChange = globalConfig != null
+                && mService.getGlobalConfiguration().diff(globalConfig) != 0;
+        if (DEBUG_CONFIGURATION) Slog.v(TAG_CONFIGURATION,
+                "Starting activity when config will change = " + stack.mConfigWillChange);
 
+        // 与下面 Binder.restoreCallingIdentity(origId) 成对出现，用于权限控制
+        final long origId = Binder.clearCallingIdentity();
 
+        if (aInfo != null &&
+                (aInfo.applicationInfo.privateFlags
+                        & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0) {
+            // 如果在 <activity> 的 android:process 属性添加不同于包名的值就会进入下面的条件
+            if (aInfo.processName.equals(aInfo.applicationInfo.packageName)) {
+                final ProcessRecord heavy = mService.mHeavyWeightProcess;
+                if (heavy != null && (heavy.info.uid != aInfo.applicationInfo.uid
+                        || !heavy.processName.equals(aInfo.processName))) {
+                    int appCallingUid = callingUid;
+                    if (caller != null) {
+                        ProcessRecord callerApp = mService.getRecordForAppLocked(caller);
+                        if (callerApp != null) {
+                            appCallingUid = callerApp.info.uid;
+                        } else {
+                            Slog.w(TAG, "Unable to find app for caller " + caller
+                                    + " (pid=" + callingPid + ") when starting: "
+                                    + intent.toString());
+                            ActivityOptions.abort(options);
+                            return ActivityManager.START_PERMISSION_DENIED;
+                        }
+                    }
 
+                    IIntentSender target = mService.getIntentSenderLocked(
+                            ActivityManager.INTENT_SENDER_ACTIVITY, "android",
+                            appCallingUid, userId, null, null, 0, new Intent[] { intent },
+                            new String[] { resolvedType }, PendingIntent.FLAG_CANCEL_CURRENT
+                                    | PendingIntent.FLAG_ONE_SHOT, null);
 
+                    Intent newIntent = new Intent();
+                    if (requestCode >= 0) {
+                        // 调用者需要返回信息
+                        newIntent.putExtra(HeavyWeightSwitcherActivity.KEY_HAS_RESULT, true);
+                    }
+                    newIntent.putExtra(HeavyWeightSwitcherActivity.KEY_INTENT,
+                            new IntentSender(target));
+                    if (heavy.activities.size() > 0) {
+                        ActivityRecord hist = heavy.activities.get(0);
+                        newIntent.putExtra(HeavyWeightSwitcherActivity.KEY_CUR_APP,
+                                hist.packageName);
+                        newIntent.putExtra(HeavyWeightSwitcherActivity.KEY_CUR_TASK,
+                                hist.getTask().taskId);
+                    }
+                    newIntent.putExtra(HeavyWeightSwitcherActivity.KEY_NEW_APP,
+                            aInfo.packageName);
+                    newIntent.setFlags(intent.getFlags());
+                    newIntent.setClassName("android",
+                            HeavyWeightSwitcherActivity.class.getName());
+                    intent = newIntent;
+                    resolvedType = null;
+                    caller = null;
+                    callingUid = Binder.getCallingUid();
+                    callingPid = Binder.getCallingPid();
+                    componentSpecified = true;
+                    rInfo = mSupervisor.resolveIntent(intent, null /*resolvedType*/, userId);
+                    aInfo = rInfo != null ? rInfo.activityInfo : null;
+                    if (aInfo != null) {
+                        aInfo = mService.getActivityInfoForUser(aInfo, userId);
+                    }
+                }
+            }
+        }
 
+        final ActivityRecord[] outRecord = new ActivityRecord[1];
+        // 此处方法名为 xxxLocked 的含意是此方法处于 synchronized 块中
+        int res = startActivityLocked(caller, intent, ephemeralIntent, resolvedType,
+                aInfo, rInfo, voiceSession, voiceInteractor,
+                resultTo, resultWho, requestCode, callingPid,
+                callingUid, callingPackage, realCallingPid, realCallingUid, startFlags,
+                options, ignoreTargetSecurity, componentSpecified, outRecord, container,
+                inTask, reason);
 
+        Binder.restoreCallingIdentity(origId);
 
+        ...
+        
+        return res;
+    }
+}
+```
 
+---
 
-
+看了两天 startActivity 的源码，提取了启动过程中关键步骤（开篇时的时序图），整个过程涉及茫茫多知识点，整理起来异常困难。关键是很多的仔细不知所以然，可能会误导读者，篇暂时定为开篇，等理清非主干细节后再来续写。
 
 ## 参考链接
 > [Android Application Launch explained: from Zygote to your Activity.onCreate()](https://android.jlelse.eu/android-application-launch-explained-from-zygote-to-your-activity-oncreate-8a8f036864b)<br/>
 > [Android系统启动-zygote篇](http://gityuan.com/2016/02/13/android-zygote/)<br/>
 > [四大组件之ActivityRecord](http://gityuan.com/2017/06/11/activity_record/)
-
